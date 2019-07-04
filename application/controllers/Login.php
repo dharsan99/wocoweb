@@ -1,0 +1,451 @@
+<?php if(!defined('BASEPATH')) exit('No direct script access allowed');
+
+/**
+ * Class : Login (LoginController)
+ * Login class to control to authenticate user credentials and starts user's session.
+ * @author : Kishor Mali
+ * @version : 1.1
+ * @since : 15 November 2016
+ */
+class Login extends CI_Controller
+{
+    /**
+     * This is default constructor of the class
+     */
+    public function __construct()
+    {
+        parent::__construct();
+        $this->load->model('login_model');
+    }
+
+    /**
+     * Index Page for this controller.
+     */
+    public function index()
+    {
+        $this->isLoggedIn();
+    }
+
+    /**
+     * This function used to check the user is logged in or not
+     */
+    function isLoggedIn()
+    {
+        $isLoggedIn = $this->session->userdata('isLoggedIn');
+        if(!isset($isLoggedIn) || $isLoggedIn != TRUE)
+        {
+            $data["role"] = ROLE_EMPLOYEE;
+            $this->load->view('login', $data);
+        }
+        else
+        {
+            redirect('/dashboard');
+        }
+    }
+
+
+
+
+    /**
+     * This function used to check the user is logged in or not
+     */
+    function masterLogin()
+    {
+        $isLoggedIn = $this->session->userdata('isLoggedIn');
+        if(!isset($isLoggedIn) || $isLoggedIn != TRUE)
+        {
+            $data["role"] = ROLE_SYSTEM_ADMIN;
+            $this->load->view('login', $data);
+        }
+        else
+        {
+            redirect('/dashboard');
+        }
+    }
+
+
+    /**
+     * This function used to check the user is logged in or not
+     */
+    function adminLogin()
+    {
+        $isLoggedIn = $this->session->userdata('isLoggedIn');
+        if(!isset($isLoggedIn) || $isLoggedIn != TRUE)
+        {
+            $data["role"] = ROLE_ADMIN;
+            $this->load->view('login', $data);
+        }
+        else
+        {
+            redirect('/dashboard');
+        }
+    }
+
+
+    /**
+     * This function used to check the user is logged in or not
+     */
+    function hrLogin()
+    {
+        $isLoggedIn = $this->session->userdata('isLoggedIn');
+        if(!isset($isLoggedIn) || $isLoggedIn != TRUE)
+        {
+            $data["role"] = ROLE_HR;
+            $this->load->view('login', $data);
+        }
+        else
+        {
+            redirect('/dashboard');
+        }
+    }
+
+    public function adminSwitchMode($mode = 0)
+    {
+      $isLoggedIn = $this->session->userdata('isLoggedIn');
+      if(isset($isLoggedIn) && $isLoggedIn == TRUE)
+      {
+          $role = $this->session->userdata('role');
+          $isHr = $this->session->userdata('isHr');
+          if ($role == ROLE_ADMIN && $isHr == 1) {
+            $this->session->set_userdata('mode', $mode);
+            echo json_encode( array('status' => 1, 'message' => 'Success' ));
+            die();
+          }else {
+            echo json_encode( array('status' => 0, 'message' => 'Access Denied' ));
+            die();
+          }
+      }
+      else
+      {
+          echo json_encode( array('status' => 0, 'message' => 'Access Denied' ));
+          die();
+      }
+    }
+
+
+
+
+
+    /**
+     * This function used to logged in user
+     */
+    public function loginMe()
+    {
+        $this->load->library('form_validation');
+        $roleId  = $this->input->post('role');
+
+        $this->form_validation->set_rules('email', 'Email', 'required|valid_email|max_length[128]|trim');
+        $this->form_validation->set_rules('password', 'Password', 'required|max_length[32]');
+        $this->form_validation->set_rules('role', 'Undefined Access', 'required|max_length[2]');
+
+        if($this->form_validation->run() == FALSE)
+        {
+            $data["role"] = $roleId;
+            $this->load->view('login', $data);
+        }
+        else
+        {
+            $email = strtolower($this->security->xss_clean($this->input->post('email')));
+            $password = $this->input->post('password');
+
+            $result = $this->login_model->loginMe($email, $password, $roleId);
+
+            if(empty($result))
+            {
+                $this->session->set_flashdata('error', 'Email or password mismatch');
+                $data["role"] = $roleId;
+                $this->load->view('login', $data);
+            }
+            elseif ($result->email_verified == 0) {
+              $this->session->set_flashdata('error', "Your email is not verified.\nPlease verify your email to login.");
+              $data["role"] = $roleId;
+              $this->load->view('login', $data);
+            }
+            elseif ($result->status != 1) {
+              $this->session->set_flashdata('error', "Your account has been blocked or pending.\nPlease contact your Admin or Manager.");
+              $data["role"] = $roleId;
+              $this->load->view('login', $data);
+            }
+            else {
+
+                $lastLoginData = $this->login_model->lastLoginInfo($result->userId);
+                if ($lastLoginData == NULL) {
+                  $lastLogin = "";
+                }else {
+                  $lastLogin = $lastLoginData->createdDtm;
+                }
+
+                $sessionArray = array(
+                                        'userId'=>$result->userId,
+                                        'role'=>$result->roleId,
+                                        'roleText'=>$result->role,
+                                        'name'=>$result->name,
+                                        'companyId'=> $result->company_id,
+                                        'isHr'=> $result->is_hr,
+                                        'lastLogin'=> $lastLogin,
+                                        'isLoggedIn' => TRUE
+                                );
+
+                $this->session->set_userdata($sessionArray);
+
+                unset($sessionArray['userId'], $sessionArray['isLoggedIn'], $sessionArray['lastLogin']);
+
+                $loginInfo = array("userId"=>$result->userId, "sessionData" => json_encode($sessionArray), "machineIp"=>$_SERVER['REMOTE_ADDR'], "userAgent"=>getBrowserAgent(), "agentString"=>$this->agent->agent_string(), "platform"=>$this->agent->platform());
+                $this->login_model->lastLogin($loginInfo);
+                redirect('/dashboard');
+            }
+
+        }
+    }
+
+    /**
+     * This function used to load forgot password view
+     */
+    public function forgotPassword()
+    {
+        $isLoggedIn = $this->session->userdata('isLoggedIn');
+
+        if(!isset($isLoggedIn) || $isLoggedIn != TRUE)
+        {
+            $this->load->view('forgotPassword');
+        }
+        else
+        {
+            redirect('/dashboard');
+        }
+    }
+
+    /**
+     * This function used to generate reset password request link
+     */
+    function resetPasswordUser()
+    {
+        $status = '';
+
+        $this->load->library('form_validation');
+
+        $this->form_validation->set_rules('login_email','Email','trim|required|valid_email');
+
+        if($this->form_validation->run() == FALSE)
+        {
+            $this->forgotPassword();
+        }
+        else
+        {
+            $email = strtolower($this->security->xss_clean($this->input->post('login_email')));
+
+            if($this->login_model->checkEmailExist($email))
+            {
+                $encoded_email = urlencode($email);
+
+                $this->load->helper('string');
+                $data['email'] = $email;
+                $data['activation_id'] = random_string('alnum',15);
+                $data['createdDtm'] = date('Y-m-d H:i:s');
+                $data['agent'] = getBrowserAgent();
+                $data['client_ip'] = $this->input->ip_address();
+
+                $save = $this->login_model->resetPasswordUser($data);
+
+                if($save)
+                {
+                    $data1['reset_link'] = base_url() . "resetPasswordConfirmUser/" . $data['activation_id'] . "/" . $encoded_email;
+                    $userInfo = $this->login_model->getCustomerInfoByEmail($email);
+
+                    if(!empty($userInfo)){
+                        $data1["name"] = $userInfo->name;
+                        $data1["email"] = $userInfo->email;
+                        $data1["message"] = "Reset Your Password";
+                    }
+
+                    $sendStatus = resetPasswordEmail($data1);
+
+                    if($sendStatus){
+                        $status = "send";
+                        setFlashData($status, "Reset password link sent successfully, please check mails.");
+                    } else {
+                        $status = "notsend";
+                        setFlashData($status, "Email has been failed, try again.");
+                    }
+                }
+                else
+                {
+                    $status = 'unable';
+                    setFlashData($status, "It seems an error while sending your details, try again.");
+                }
+            }
+            else
+            {
+                $status = 'invalid';
+                setFlashData($status, "This email is not registered with us.");
+            }
+            redirect('/forgotPassword');
+        }
+    }
+
+    /**
+     * This function used to reset the password
+     * @param string $activation_id : This is unique id
+     * @param string $email : This is user email
+     */
+    function resetPasswordConfirmUser($activation_id, $email)
+    {
+        // Get email and activation code from URL values at index 3-4
+        $email = urldecode($email);
+
+        // Check activation id in database
+        $is_correct = $this->login_model->checkActivationDetails($email, $activation_id);
+
+        $data['email'] = $email;
+        $data['activation_code'] = $activation_id;
+
+        if ($is_correct == 1)
+        {
+            $this->load->view('newPassword', $data);
+        }
+        else
+        {
+            redirect('/login');
+        }
+    }
+
+    /**
+     * This function used to create new password for user
+     */
+    function createPasswordUser()
+    {
+        $status = '';
+        $message = '';
+        $email = strtolower($this->input->post("email"));
+        $activation_id = $this->input->post("activation_code");
+
+        $this->load->library('form_validation');
+
+        $this->form_validation->set_rules('password','Password','required|max_length[20]');
+        $this->form_validation->set_rules('cpassword','Confirm Password','trim|required|matches[password]|max_length[20]');
+
+        if($this->form_validation->run() == FALSE)
+        {
+            $this->resetPasswordConfirmUser($activation_id, urlencode($email));
+        }
+        else
+        {
+            $password = $this->input->post('password');
+            $cpassword = $this->input->post('cpassword');
+
+            // Check activation id in database
+            $is_correct = $this->login_model->checkActivationDetails($email, $activation_id);
+
+            if($is_correct == 1)
+            {
+                $this->login_model->createPasswordUser($email, $password);
+
+                $status = 'success';
+                $message = 'Password reset successfully';
+            }
+            else
+            {
+                $status = 'error';
+                $message = 'Password reset failed';
+            }
+
+            setFlashData($status, $message);
+            redirect("/login");
+        }
+    }
+
+    public function verifyEmail()
+    {
+      $keyTxt = $this->input->get('token');
+
+      if ($keyTxt == '') {
+        $this->session->set_flashdata('error', 'Invalid Url');
+        redirect("/login");
+      }
+      $keyTxt = $this->encryption->decrypt(urldecode($keyTxt));
+      $strArr = explode(SEPARATOR, $keyTxt);
+      if (count($strArr) != 2) {
+        $this->session->set_flashdata('error', 'Invalid Url');
+        redirect("/login");
+      }
+      $userId = $strArr[0];
+      $email  = $strArr[1];
+
+      $result = $this->login_model->verifyEmail($userId, $email);
+      if ($result) {
+        $userInfo = $this->login_model->getCustomerInfoByEmail($email);
+
+        $data['data'] = array(
+    			'name' => $userInfo->fname,
+    			'action_link' => '',
+    			'email' => $email,
+          'roleId' => $userInfo->roleId
+    		);
+    		$message = $this->load->view('email/email-verification-success', $data, TRUE);
+        $subject = "WoCo - Congratulations!";
+        sendCustomEmail($email, $subject, $message);
+
+        $data["role"] = $userInfo->roleId;
+        setFlashData('success', 'Your email verification successful.');
+        $this->load->view('login', $data);
+      }else {
+        $this->session->set_flashdata('error', 'Verification url invalid or expired.');
+        redirect("/login");
+      }
+    }
+
+    public function accessDenied()
+    {
+      $data['pageTitle'] = 'WoCo : Access Denied';
+  		$this->load->view('access-denied', $data);
+    }
+
+    public function pageNotFound()
+    {
+      $data['pageTitle'] = 'WoCo : Page Not Found';
+  		$this->load->view('pageNotFound', $data);
+    }
+
+    /**
+     * This function is used to logged out user from system
+     */
+    function logout() {
+      $role = $this->session->userdata('role');
+      $data["role"] = $role;
+      $this->session->sess_destroy ();
+      //redirect ( 'login' );
+      $this->load->view('login', $data);
+    }
+
+
+}
+
+
+
+
+
+
+/*
+function isLoggedIn()
+{
+    $isLoggedIn = $this->session->userdata('isLoggedIn');
+    $controller = $this->uri->rsegment(1);
+    $action     = $this->uri->rsegment(2);
+
+    if(!isset($isLoggedIn) || $isLoggedIn != TRUE)
+    {
+        $this->load->view('login');
+    }
+    else
+    {
+      // Check for ACL
+      if (! $this->acl->hasAccess()) {
+          if ($controller != 'dashboard' && in_array($controller . '/' . $action, $this->acl->getGuestPages())) {
+              return redirect('/dashboard');
+          }
+      }
+    }
+}
+*/
+
+?>
