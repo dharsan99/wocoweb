@@ -75,10 +75,10 @@ $query_builder = TRUE;
 
 $db['default'] = array(
 	'dsn'	=> '',
-	'hostname' => 'localhost',
-	'username' => 'ttvsmzdmwe',
-	'password' => 'Woco#2019',
-	'database' => 'ttvsmzdmwe',
+	'hostname' => 'a07yd3a6okcidwap.cbetxkdyhwsb.us-east-1.rds.amazonaws.com',
+	'username' => 'zdrkmgp333w18cve',
+	'password' => 'nkbpvs3dujm8e102',
+	'database' => 'l84dtxh4fkpvirin',
 	'dbdriver' => 'mysqli',
 	'dbprefix' => '',
 	'pconnect' => FALSE,
