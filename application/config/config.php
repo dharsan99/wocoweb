@@ -397,7 +397,7 @@ $config['sess_regenerate_destroy'] = FALSE;
 
 /*
 |--------------------------------------------------------------------------
-| Cookie Related Variables
+| Cookie Related Variable
 |--------------------------------------------------------------------------
 |
 | 'cookie_prefix'   = Set a cookie name prefix if you need to avoid collisions
