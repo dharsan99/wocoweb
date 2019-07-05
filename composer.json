@@ -10,7 +10,6 @@
 		"slack": "https://codeigniterchat.slack.com",
 		"source": "https://github.com/bcit-ci/CodeIgniter"
 	},
-	
 	"require": {
 		"php": ">=5.3.7"
 	},
